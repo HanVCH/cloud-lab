@@ -1,109 +1,117 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect } from 'react';
 
 function App() {
   const [students, setStudents] = useState([]);
-  const [form, setForm] = useState({ studentId: '', name: '', major: '' });
-  const [error, setError] = useState('');
+  const [form, setForm] = useState({ studentId: '', name: '', email: '' });
+  const [editingId, setEditingId] = useState(null);
 
-  // 1. Lấy danh sách sinh viên khi tải trang
+  // Lấy danh sách sinh viên khi tải trang
   const fetchStudents = async () => {
-    try {
-      const res = await axios.get('/api/students');
-      setStudents(res.data);
-      setError('');
-    } catch (err) {
-      console.error('Lỗi tải dữ liệu:', err);
-      setError('Lỗi tải dữ liệu từ Server. Vui lòng kiểm tra lại kết nối!');
-    }
+    const res = await fetch('/api/students');
+    const data = await res.json();
+    setStudents(data);
   };
 
   useEffect(() => {
     fetchStudents();
   }, []);
 
-  // 2. Thêm sinh viên mới
+  // Xử lý Thêm hoặc Cập nhật sinh viên
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      await axios.post('/api/students', form);
-      setForm({ studentId: '', name: '', major: '' });
-      fetchStudents(); // Tải lại danh sách
-    } catch (err) {
-      console.error('Lỗi thêm sinh viên:', err);
-      alert('Không thể thêm sinh viên. Vui lòng kiểm tra lại thông tin!');
+    if (editingId) {
+      // Gọi API PUT (Cập nhật)
+      await fetch(`/api/students/${editingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      });
+      setEditingId(null);
+    } else {
+      // Gọi API POST (Thêm mới)
+      await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      });
     }
+    setForm({ studentId: '', name: '', email: '' });
+    fetchStudents();
   };
 
-  // 3. Xóa sinh viên
+  // Chuẩn bị dữ liệu để sửa
+  const handleEdit = (student) => {
+    setEditingId(student._id);
+    setForm({ studentId: student.studentId, name: student.name, email: student.email });
+  };
+
+  // Xử lý Xóa sinh viên
   const handleDelete = async (id) => {
-    if (!window.confirm('Bạn có chắc muốn xóa sinh viên này?')) return;
-    try {
-      await axios.delete(`/api/students/${id}`);
-      fetchStudents();
-    } catch (err) {
-      console.error('Lỗi xóa:', err);
-    }
+    await fetch(`/api/students/${id}`, { method: 'DELETE' });
+    fetchStudents();
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
+    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
       <h2>Ứng Dụng Quản Lý Sinh Viên (MERN Stack)</h2>
 
-      {error && <div style={{ color: 'red', marginBottom: '15px' }}>{error}</div>}
-
-      {/* Form thêm sinh viên */}
-      <form onSubmit={handleSubmit} style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
-        <input 
-          type="text" 
-          placeholder="MSSV" 
-          value={form.studentId} 
-          onChange={(e) => setForm({ ...form, studentId: e.target.value })} 
-          required 
+      {/* Form nhập dữ liệu */}
+      <form onSubmit={handleSubmit} style={{ marginBottom: '20px' }}>
+        <input
+          type="text"
+          placeholder="MSSV"
+          value={form.studentId}
+          onChange={(e) => setForm({ ...form, studentId: e.target.value })}
+          required
         />
-        <input 
-          type="text" 
-          placeholder="Họ và Tên" 
-          value={form.name} 
-          onChange={(e) => setForm({ ...form, name: e.target.value })} 
-          required 
+        <input
+          type="text"
+          placeholder="Họ và Tên"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          required
         />
-        <input 
-          type="text" 
-          placeholder="Ngành Học" 
-          value={form.major} 
-          onChange={(e) => setForm({ ...form, major: e.target.value })} 
+        <input
+          type="email"
+          placeholder="Email"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          required
         />
-        <button type="submit">Thêm Sinh Viên</button>
+        <button type="submit">
+          {editingId ? 'Cập Nhật' : 'Thêm Sinh Viên'}
+        </button>
+        {editingId && (
+          <button type="button" onClick={() => { setEditingId(null); setForm({ studentId: '', name: '', email: '' }); }}>
+            Hủy
+          </button>
+        )}
       </form>
 
       {/* Bảng danh sách sinh viên */}
-      <table border="1" cellPadding="10" style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <table border="1" cellPadding="8" cellSpacing="0">
         <thead>
-          <tr style={{ background: '#f2f2f2' }}>
+          <tr>
             <th>MSSV</th>
             <th>Họ và Tên</th>
-            <th>Ngành Học</th>
+            <th>Email</th>
             <th>Thao Tác</th>
           </tr>
         </thead>
         <tbody>
-          {students.length > 0 ? (
-            students.map((st) => (
-              <tr key={st._id}>
-                <td>{st.studentId}</td>
-                <td>{st.name}</td>
-                <td>{st.major}</td>
-                <td>
-                  <button onClick={() => handleDelete(st._id)} style={{ color: 'red' }}>Xóa</button>
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="4" style={{ textAlign: 'center' }}>Chưa có sinh viên nào.</td>
+          {students.map((student) => (
+            <tr key={student._id}>
+              <td>{student.studentId}</td>
+              <td>{student.name}</td>
+              <td>{student.email}</td>
+              <td>
+                <button onClick={() => handleEdit(student)}>Sửa</button>
+                <button onClick={() => handleDelete(student._id)} style={{ color: 'red', marginLeft: '5px' }}>
+                  Xóa
+                </button>
+              </td>
             </tr>
-          )}
+          ))}
         </tbody>
       </table>
     </div>
